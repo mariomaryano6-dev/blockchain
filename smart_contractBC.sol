@@ -5,7 +5,7 @@ contract smart_contractBC {
     // === Roles ===
     enum Role { NONE, MANUFACTURER, SUPPLIER, RETAILER }
 
-    address public owner;              // admin who manages roles
+    address public owner;
     mapping(address => Role) public roles;
 
     // === Product data ===
@@ -16,6 +16,7 @@ contract smart_contractBC {
         string name;
         string ipfsHash;
         address registeredBy;
+        address currentOwner;   // who currently holds the product
         bool exists;
     }
 
@@ -25,15 +26,20 @@ contract smart_contractBC {
         uint256 indexed id,
         string name,
         string ipfsHash,
-        address indexed registeredBy
+        address indexed currentOwner
     );
 
     event RoleUpdated(address indexed user, Role role);
 
+    event ProductTransferred(
+        uint256 indexed id,
+        address indexed from,
+        address indexed to
+    );
+
     // === Constructor ===
     constructor() {
         owner = msg.sender;
-        // The deployer is Manufacturer by default
         roles[msg.sender] = Role.MANUFACTURER;
     }
 
@@ -48,6 +54,11 @@ contract smart_contractBC {
         _;
     }
 
+    modifier productExists(uint256 _id) {
+        require(products[_id].exists, "Product not found");
+        _;
+    }
+
     // === Role management ===
     function setRole(address user, Role role) external onlyOwner {
         roles[user] = role;
@@ -59,8 +70,6 @@ contract smart_contractBC {
     }
 
     // === Product functions ===
-
-    // Manufacturer registers product (same as your old registerProduct, but role‑based)
     function registerProduct(
         string memory _name,
         string memory _ipfsHash
@@ -71,6 +80,7 @@ contract smart_contractBC {
             productCount,
             _name,
             _ipfsHash,
+            msg.sender,
             msg.sender,
             true
         );
@@ -83,15 +93,34 @@ contract smart_contractBC {
         );
     }
 
-    // Anyone (Client, Supplier, Retailer, etc.) can verify
+    // Transfer product between actors
+    function transferProduct(uint256 _id, address _to)
+    public
+    productExists(_id)
+    {
+        Product storage p = products[_id];
+
+        // Only current owner can transfer
+        require(msg.sender == p.currentOwner, "Not product owner");
+
+        // Recipient must have a valid role
+        require(roles[_to] != Role.NONE, "Recipient has no role");
+
+        address previousOwner = p.currentOwner;
+        p.currentOwner = _to;
+
+        emit ProductTransferred(_id, previousOwner, _to);
+    }
+
+    // Verify product details
     function verifyProduct(uint256 _id)
     public
     view
-    returns (bool, string memory, string memory)
+    productExists(_id)
+    returns (bool, string memory, string memory, address, address)
     {
-        require(products[_id].exists, "Product not found");
-
         Product memory p = products[_id];
-        return (true, p.name, p.ipfsHash);
+        return (true, p.name, p.ipfsHash, p.registeredBy, p.currentOwner);
     }
 }
+
