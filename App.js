@@ -16,6 +16,8 @@ function App() {
     const [productName, setProductName] = useState('');
     const [file, setFile] = useState(null);
     const [lastProduct, setLastProduct] = useState(null);
+    const [transferId, setTransferId] = useState('');
+    const [recipient, setRecipient] = useState('');
     const [loading, setLoading] = useState(false);
 
     async function requestAccount() {
@@ -34,7 +36,6 @@ function App() {
             const provider = new ethers.BrowserProvider(window.ethereum);
             const signer = await provider.getSigner();
             const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-
             const r = await contract.getMyRole();
             const n = Number(r);
             if (n === 1) setRole('MANUFACTURER');
@@ -102,6 +103,69 @@ function App() {
             setLoading(false);
         }
     }
+    async function transferProduct() {
+        if (!transferId || !recipient) {
+            alert('Veuillez entrer l’ID du produit et l’adresse du destinataire.');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const signer = await provider.getSigner();
+            const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+            const tx = await contract.transferProduct(
+                ethers.toBigInt(transferId),
+                recipient
+            );
+            console.log("Transfer ID:", transferId);
+            await tx.wait();
+            alert('Produit transféré avec succès !');
+            await fetchLastProduct();
+        } catch (err) {
+            console.error("Full error:", err);
+
+            if (err.reason) {
+                alert("Erreur: " + err.reason);
+            } else if (err.shortMessage) {
+                alert("Erreur: " + err.shortMessage);
+            } else {
+                alert("Erreur: " + err.message);
+            }
+
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    async function assignRole() {
+        if (!recipient) {
+            alert("Enter recipient address");
+            return;
+        }
+
+        if (!ethers.isAddress(recipient)) {
+            alert("Invalid address");
+            return;
+        }
+
+        try {
+            const provider = new ethers.BrowserProvider(window.ethereum);
+            const signer = await provider.getSigner();
+            const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+            // 2 = SUPPLIER (you can change to 3 for RETAILER)
+            const tx = await contract.setRole(recipient, 2);
+            await tx.wait();
+
+            alert("Role assigned successfully");
+        } catch (err) {
+            console.error(err);
+            alert("Role assignment failed");
+        }
+    }
+
 
     async function fetchLastProduct() {
         if (!window.ethereum) return;
@@ -116,6 +180,7 @@ function App() {
                     id: product.id.toString(),
                     name: product.name,
                     ipfsHash: product.ipfsHash,
+                    currentOwner: product.currentOwner,
                 });
             }
         } catch (err) {
@@ -125,6 +190,7 @@ function App() {
 
     return (
         <div className="App">
+
             <header className="App-header">
                 <h1>Anti-Contrefaçon</h1>
 
@@ -188,9 +254,34 @@ function App() {
                                     <strong>Nom :</strong> {lastProduct.name} | <strong>ID :</strong> #
                                     {lastProduct.id}
                                 </p>
+                                <p><strong>Propriétaire actuel :</strong> {lastProduct.currentOwner}</p>
                                 <p style={{ color: 'green' }}>✅ Authentifié sur Blockchain</p>
                             </div>
                         )}
+                        <div className="form-box" style={{ marginTop: '20px' }}>
+                            <h3>Transférer un produit</h3>
+                            <input
+                                type="text"
+                                placeholder="ID du produit"
+                                onChange={(e) => setTransferId(e.target.value)}
+                            />
+                            <input
+                                type="text"
+                                placeholder="Adresse du destinataire"
+                                onChange={(e) => setRecipient(e.target.value)}
+                            />
+                            <button
+                                className="submit-btn"
+                                onClick={transferProduct}
+                                disabled={loading}
+                            >
+                                {loading ? 'Transfert...' : 'Transférer le produit'}
+                            </button>
+                            <button onClick={assignRole}>
+                                Assign Supplier Role
+                            </button>
+                        </div>
+
                     </div>
                 )}
             </header>
@@ -199,3 +290,4 @@ function App() {
 }
 
 export default App;
+
