@@ -7,7 +7,8 @@ export const CONTRACT_ABI = [
 
     // products
     "function registerProduct(string _name, string _ipfsHash) public",
-    "function getProductDetails(uint256 _id) public view returns uint256,string memory,string memory,address)",
-    "function products(uint256) public view returns (uint256 id, string name, string ipfsHash, address registeredBy, bool exists)",
+    "function getProductDetails(uint256 _id) public view returns uint256,string memory,string memory,address,address)",
+    "function products(uint256) public view returns (uint256 id, string name, string ipfsHash, address registeredBy, address currentOwner, bool exists)",
     "function productCount() public view returns (uint256)"
+
 ];
